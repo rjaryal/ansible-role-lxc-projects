@@ -1,0 +1,56 @@
+---
+
+- name: lxc > projects > Pre-requisite checks
+  include_tasks: check.yml
+
+- name: lxc > projects > check > LXC projects
+  shell: lxc project list ${LXC_CLUSTER_ARG} --format json | jq -r '.[] | .name'
+  environment:
+    LXC_CLUSTER_ARG: "{{ lxc_cluster ~ ':' }}"
+  register: lxc_project_cmd
+  changed_when: false
+
+- name: lxc > projects > declare > LXC project names
+  set_fact:
+    lxc_project_all: "{{ lxc_project_cmd.stdout_lines }}"
+
+- name: lxc > projects > failure > LXC project names
+  fail:
+    msg: "LXC project not available."
+  when: not (lxc_project_all | default([]) | length)
+
+- name: lxc > projects > debug > LXC project names
+  debug:
+    msg: "{{ lxc_project_all }}"
+    verbosity: 4
+
+- name: lxc > projects > check > Default lxc project name
+  shell: lxc project list ${LXC_CLUSTER_ARG} --format csv | sed -n -e 's/ *(current).*$//p'
+  environment:
+    LXC_CLUSTER_ARG: "{{ lxc_cluster ~ ':' }}"
+  register: lxc_project_cmd
+  changed_when: false
+
+- name: lxc > projects > declare > Default lxc project name
+  set_fact:
+    lxc_project_default: "{{ lxc_project_cmd.stdout }}"
+
+- name: lxc > projects > debug > Default lxc project name
+  debug:
+    msg: "{{ lxc_project_default }}"
+    verbosity: 3
+
+- name: lxc > projects > declare > LXC Project name
+  set_fact:
+    lxc_project: "{{ lxc_project_default }}"
+  when: lxc_project is undefined or lxc_project is none
+
+- name: lxc > projects > failure > LXC project name
+  fail:
+    msg: "Select one of the available lxc_project from [{{ lxc_project_all | join(', ') }}]."
+  when: lxc_project not in lxc_project_all
+
+- name: lxc > projects > debug > LXC project name
+  debug:
+    msg: "{{ lxc_project }}"
+    verbosity: 2
